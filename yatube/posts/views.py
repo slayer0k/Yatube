@@ -39,7 +39,7 @@ def profile(request, username):
     count = page_obj.paginator.count
     following = (
         request.user.is_authenticated
-        and request.user.follower.filter(author=author))
+        and request.user.follower.filter(author=author).exists())
     context = {
         'following': following,
         'author': author,
