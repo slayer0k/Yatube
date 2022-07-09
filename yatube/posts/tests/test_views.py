@@ -1,6 +1,5 @@
 import shutil
 import tempfile
-from tokenize import group
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -148,8 +147,7 @@ class PostPagesTests(TestCase):
             response.content,
             self.guest_client.get(reverse('posts:index')).content
         )
-        
-      
+
     def test_follow(self):
         """авторизованный пользователь может подписаваться"""
         self.assertFalse(
@@ -166,8 +164,7 @@ class PostPagesTests(TestCase):
                 author=self.user,
                 user=self.second_user).exists()
         )
-        
-    
+
     def test_unfollow(self):
         """Проверка возможности отписки"""
         self.authorized_client.force_login(self.second_user)
@@ -184,7 +181,6 @@ class PostPagesTests(TestCase):
                 user=self.second_user,
             ).exists()
         )
-
 
     def test_follow_index_context(self):
         """
@@ -204,4 +200,3 @@ class PostPagesTests(TestCase):
             reverse('posts:follow_index')
         )
         self.assertNotIn(self.post, response.context.get('page_obj'))
-
