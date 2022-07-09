@@ -37,11 +37,9 @@ def profile(request, username):
     posts = author.posts.select_related('group')
     page_obj = paginator(posts, request.GET.get('page'))
     count = page_obj.paginator.count
+    following = False
     if request.user.is_authenticated:
-        following = Follow.objects.filter(
-            author=author).filter(user=request.user).exists()
-    else:
-        following = False
+        following = request.user.follower.filter(author=author).exists()
     context = {
         'following': following,
         'author': author,
@@ -56,12 +54,11 @@ def post_detail(request, post_id):
         'author'), pk=post_id)
     count = post.author.posts.count
     comments = post.comments.select_related('author')
-    form = CommentForm()
     context = {
         'post': post,
         'count': count,
         'comments': comments,
-        'form': form
+        'form': CommentForm()
     }
     return render(request, 'posts/post_detail.html', context)
 
@@ -125,23 +122,21 @@ def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
     if author == request.user:
         return redirect('posts:profile', username)
-    if not Follow.objects.filter(author=author, user=request.user).exists():
-        Follow.objects.create(author=author, user=request.user)
+    Follow.objects.get_or_create(author=author, user=request.user)
     return redirect('posts:profile', username)
 
 
 @login_required
 def profile_unfollow(request, username):
     author = get_object_or_404(User, username=username)
-    if Follow.objects.filter(author=author, user=request.user).exists():
-        Follow.objects.filter(author=author, user=request.user).delete()
+    Follow.objects.filter(author=author, user=request.user).delete()
     return redirect('posts:profile', username)
 
 
 @login_required
 def follow_index(request):
-    authors = [object.author for object in request.user.follower.all()]
-    posts = Post.objects.select_related('group').filter(author__in=authors)
+    posts = Post.objects.select_related('group').filter(
+        author__in=request.user.follower.values_list('author'))
     page_obj = paginator(posts, request.GET.get('page'))
     context = {
         'page_obj': page_obj,

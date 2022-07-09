@@ -1,5 +1,6 @@
 import shutil
 import tempfile
+from tokenize import group
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -51,6 +52,7 @@ class PostPagesTests(TestCase):
             slug='test-slug-2',
             description='test description',
         )
+        cls.second_user = User.objects.create_user(username='Mao')
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -61,6 +63,7 @@ class PostPagesTests(TestCase):
         self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
+        caches['default'].clear()
 
     def test_pages_has_right_context_create(self):
         '''Проверка передачи правильного контекста в форму'''
@@ -130,37 +133,47 @@ class PostPagesTests(TestCase):
 
     def test_zache(self):
         """Проверка кэширования"""
-        caches['default'].clear()
-        post_for_caches = Post.objects.create(
+        response = self.guest_client.get(
+            reverse('posts:index'))
+        Post.objects.create(
             author=self.user,
             group=self.group,
-            text='test caches'
+            text='test caches')
+        self.assertEqual(
+            response.content,
+            self.guest_client.get(reverse('posts:index')).content
         )
-        self.guest_client.get(reverse('posts:index'))
-        test_cache = set(caches['default'].get('posts'))
-        post_for_caches.delete()
-        self.guest_client.get(reverse('posts:index'))
-        self.assertEqual(test_cache, set(caches['default'].get('posts')))
         caches['default'].clear()
-        self.guest_client.get(reverse('posts:index'))
-        self.assertNotEqual(test_cache, set(caches['default'].get('posts')))
-
+        self.assertNotEqual(
+            response.content,
+            self.guest_client.get(reverse('posts:index')).content
+        )
+        
+      
     def test_follow(self):
-        """авторизованный пользователь может подписаваться и отписываться"""
-        second_user = User.objects.create_user(username='Mao')
+        """авторизованный пользователь может подписаваться"""
         self.assertFalse(
             Follow.objects.filter(
                 author=self.user,
-                user=second_user).exists()
+                user=self.second_user).exists()
         )
-        self.authorized_client.force_login(second_user)
+        self.authorized_client.force_login(self.second_user)
         self.authorized_client.get(
             reverse('posts:profile_follow', args=(self.user.username,))
         )
         self.assertTrue(
             Follow.objects.filter(
                 author=self.user,
-                user=second_user).exists()
+                user=self.second_user).exists()
+        )
+        
+    
+    def test_unfollow(self):
+        """Проверка возможности отписки"""
+        self.authorized_client.force_login(self.second_user)
+        Follow.objects.create(
+            author=self.user,
+            user=self.second_user
         )
         self.authorized_client.get(
             reverse('posts:profile_unfollow', args=(self.user.username,))
@@ -168,28 +181,27 @@ class PostPagesTests(TestCase):
         self.assertFalse(
             Follow.objects.filter(
                 author=self.user,
-                user=second_user,
+                user=self.second_user,
             ).exists()
         )
+
 
     def test_follow_index_context(self):
         """
         Проверка: новая запись появляется только у подписвшегося пользователя
         """
-        test_user = User.objects.create_user(username='Mao')
         Follow.objects.create(
             author=self.user,
-            user=test_user
+            user=self.second_user
         )
-        self.authorized_client.force_login(test_user)
+        self.authorized_client.force_login(self.second_user)
         response = self.authorized_client.get(
             reverse('posts:follow_index')
         )
         self.assertIn(self.post, response.context.get('page_obj'))
-        self.authorized_client.force_login(
-            User.objects.create_user(username='Pao')
-        )
+        self.authorized_client.force_login(self.user)
         response = self.authorized_client.get(
             reverse('posts:follow_index')
         )
         self.assertNotIn(self.post, response.context.get('page_obj'))
+

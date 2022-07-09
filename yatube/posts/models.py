@@ -1,8 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 
-from core.models import CreateModel
-
 User = get_user_model()
 
 POST_TEXT_LIMIT: int = 15
@@ -56,7 +54,7 @@ class Post(models.Model):
         return self.text[:POST_TEXT_LIMIT]
 
 
-class Comment(CreateModel):
+class Comment(models.Model):
     post = models.ForeignKey(
         Post,
         related_name="comments",
@@ -68,6 +66,7 @@ class Comment(CreateModel):
         on_delete=models.CASCADE
     )
     text = models.TextField('Текст комментария')
+    created = models.DateTimeField("Дата создания", auto_now_add=True)
 
     class Meta:
         verbose_name = 'Комментарий',
@@ -86,3 +85,13 @@ class Follow(models.Model):
         related_name='following',
         on_delete=models.CASCADE
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'author'], name='unique_follow'),
+            models.CheckConstraint(
+                check=~models.Q(author=models.F('user')),
+                name='follow_himself'
+            ),
+        ]
