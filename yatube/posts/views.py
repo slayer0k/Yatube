@@ -136,7 +136,8 @@ def profile_unfollow(request, username):
 @login_required
 def follow_index(request):
     posts = Post.objects.select_related('group').filter(
-        author__in=request.user.follower.values_list('author'))
+        author__following__user=request.user
+    )
     page_obj = paginator(posts, request.GET.get('page'))
     context = {
         'page_obj': page_obj,
